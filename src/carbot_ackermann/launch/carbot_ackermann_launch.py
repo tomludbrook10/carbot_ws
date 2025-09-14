@@ -12,7 +12,7 @@ from launch.event_handlers import OnProcessExit
 
 def generate_launch_description():
     # Find package directory
-    pkg_share = FindPackageShare('carbot_ackermann')
+    pkg_share = FindPackageShare(package='carbot_ackermann').find('carbot_ackermann')
     
     # Declare launch arguments
     config_file_arg = DeclareLaunchArgument(
@@ -51,17 +51,34 @@ def generate_launch_description():
         respawn=True,
         respawn_delay=2.0
     )
-    
-    # Control Node
-    control_node = Node(
-        package='carbot_ackermann',
-        executable='control_node',
-        name='control_node',
-        output='screen',
-        parameters=[LaunchConfiguration('config_file')],
-        respawn=True,
-        respawn_delay=2.0
+
+    ## imu node 
+    imu_node = Node(
+        package='imu_sensor',
+        executable='imu_publisher',
+        name='imu_node',     
+        output='screen'
     )
+
+    robot_localization_node = Node(
+        package='robot_localization',
+        executable='ekf_node',
+        name='ekf_node',
+        output='screen',
+        parameters=[os.path.join(pkg_share, 'config/ekf.yaml'), 
+        {'use_sim_time': LaunchConfiguration('use_sim_time')}]
+    )
+    
+    # # Control Node
+    # control_node = Node(
+    #     package='carbot_ackermann',
+    #     executable='control_node',
+    #     name='control_node',
+    #     output='screen',
+    #     parameters=[LaunchConfiguration('config_file')],
+    #     respawn=True,
+    #     respawn_delay=2.0
+    # )
     
     # Log startup info
     startup_info = LogInfo(
@@ -79,5 +96,7 @@ def generate_launch_description():
         # Nodes - Serial Manager starts first and must succeed
         serial_manager_node,
         odometry_node,
-        control_node
+        imu_node,
+        robot_localization_node
+        #control_node
     ])

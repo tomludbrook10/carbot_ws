@@ -30,7 +30,7 @@ OdometryNode::OdometryNode(const rclcpp::NodeOptions & options)
   publish_tf_ = this->get_parameter("publish_tf").as_bool();
   
   // Create publisher
-  odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
+  odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("demo/odom", 10);
   
   // Create subscriber
   wheel_data_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
@@ -188,7 +188,7 @@ void OdometryNode::publishOdometry()
   odom.twist.covariance[14] = 1e-6;  // vz
   odom.twist.covariance[21] = 1e-6;  // wx
   odom.twist.covariance[28] = 1e-6;  // wy
-  odom.twist.covariance[35] = 0.03;  // wz
+  odom.twist.covariance[35] = 0.001;  // wz
   odom_pub_->publish(odom);
 }
 }  // namespace ackermann_robot
