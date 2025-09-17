@@ -1,0 +1,91 @@
+
+# AMCL Configuration for Ackermann Robot with LIDAR
+amcl:
+  ros__parameters:
+    # Use real time (not simulation)
+    use_sim_time: false
+    
+    # Particle filter parameters
+    min_particles: 500
+    max_particles: 2000
+    kld_err: 0.05
+    kld_z: 0.99
+    
+    # How often to resample
+    resample_interval: 1
+    
+    # Tolerance for tf transforms
+    transform_tolerance: 1.0
+    
+    # Recovery parameters (for kidnapped robot problem)
+    recovery_alpha_slow: 0.001
+    recovery_alpha_fast: 0.1
+    
+    # Initial pose (will be overridden by lifecycle manager)
+    initial_pose:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      yaw: 0.0
+    
+    # Initial uncertainty
+    initial_cov_xx: 0.25  # 0.5m x 0.5m uncertainty
+    initial_cov_yy: 0.25
+    initial_cov_aa: 0.0685  # ~10 degrees
+    
+    # GUI publishing rate for visualization
+    gui_publish_rate: 10.0
+    
+    # How often to save pose to parameter server
+    save_pose_rate: 0.5
+    
+    # Minimum movement before filter update
+    update_min_d: 0.1  # meters
+    update_min_a: 0.2  # radians (~11 degrees)
+    
+    # Laser parameters
+    laser_max_range: 12.0  # Maximum range to consider
+    laser_min_range: 0.12  # Minimum range (LDLidar minimum)
+    max_beams: 60  # How many beams to use (less = faster)
+    
+    # Laser model type (likelihood_field or beam)
+    laser_model_type: "likelihood_field"
+    
+    # Likelihood field model parameters
+    laser_likelihood_max_dist: 2.0
+    laser_z_hit: 0.5
+    laser_z_short: 0.05
+    laser_z_max: 0.05
+    laser_z_rand: 0.5
+    laser_sigma_hit: 0.2
+    laser_lambda_short: 0.1
+    
+    # Odometry model for Ackermann
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+    
+    # Odometry noise parameters (tune these based on your odometry quality)
+    # Higher values = less trust in odometry
+    alpha1: 0.2  # Rotation noise from rotation
+    alpha2: 0.2  # Rotation noise from translation  
+    alpha3: 0.2  # Translation noise from translation
+    alpha4: 0.2  # Translation noise from rotation
+    alpha5: 0.1  # Translation noise from translation (omni only)
+    
+    # Frame IDs
+    base_frame_id: "base_link"
+    odom_frame_id: "odom"
+    global_frame_id: "map"
+    
+    # Topic names
+    scan_topic: "scan"  # Will be remapped to /ldlidar_node/scan
+    map_topic: "map"
+    
+    # Service names
+    global_localization_service_name: "reinitialize_global_localization"
+    
+    # TF broadcasting
+    tf_broadcast: true
+    
+    # Set to true if you have a holonomic robot
+    # Set to false for Ackermann
+    holonomic_robot: false

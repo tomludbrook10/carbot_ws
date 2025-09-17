@@ -1,0 +1,9 @@
+map_server:
+  ros__parameters:
+    topic_name: map
+    # Other map settings...
+    qos_profile:
+      durability: transient_local
+      reliability: reliable
+      history: keep_last
+      depth: 1

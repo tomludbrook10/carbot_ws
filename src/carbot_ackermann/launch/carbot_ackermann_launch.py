@@ -69,17 +69,6 @@ def generate_launch_description():
         {'use_sim_time': LaunchConfiguration('use_sim_time')}]
     )
     
-    # # Control Node
-    # control_node = Node(
-    #     package='carbot_ackermann',
-    #     executable='control_node',
-    #     name='control_node',
-    #     output='screen',
-    #     parameters=[LaunchConfiguration('config_file')],
-    #     respawn=True,
-    #     respawn_delay=2.0
-    # )
-    
     # Log startup info
     startup_info = LogInfo(
         msg='Starting Ackermann Robot System - Serial Manager MUST connect to ESP32 or system will shut down'
