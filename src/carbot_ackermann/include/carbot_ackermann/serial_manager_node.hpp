@@ -56,6 +56,9 @@ private:
   // Serial configuration
   std::string serial_port_name_;
   int baud_rate_;
+
+  // convertion from linear_velocity to rps. 
+  double wheel_circumference_;
   
   // Communication state
   rclcpp::Time last_serial_msg_time_;

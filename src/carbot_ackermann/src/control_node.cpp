@@ -7,23 +7,16 @@ namespace ackermann_robot
 {
 
 ControlNode::ControlNode(const rclcpp::NodeOptions & options)
-: Node("control_node", options),
-  current_velocity_(0.0),
-  current_steering_(0.0)
-{
+: Node("control_node", options) {
   // Declare parameters
-  this->declare_parameter("max_acceleration", 1.0);      // m/s^2
-  this->declare_parameter("max_deceleration", 2.0);      // m/s^2
-  this->declare_parameter("max_steering_angle", 0.6);   // radians
-  this->declare_parameter("max_steering_rate", 1.0);    // rad/s
-  this->declare_parameter("wheelbase", 0.5);            // meters
+  this->declare_parameter("max_steering_angle", 0.4363326);   // radians
+  this->declare_parameter("max_speed", 1.7);
+  this->declare_parameter("wheelbase", 0.178);            // meters
   this->declare_parameter("cmd_timeout_sec", 0.5);      // seconds
   
   // Get parameters
-  max_acceleration_ = this->get_parameter("max_acceleration").as_double();
-  max_deceleration_ = this->get_parameter("max_deceleration").as_double();
   max_steering_angle_ = this->get_parameter("max_steering_angle").as_double();
-  max_steering_rate_ = this->get_parameter("max_steering_rate").as_double();
+  max_speed_ = this->get_parameter("max_speed").as_double();
   wheelbase_ = this->get_parameter("wheelbase").as_double();
   cmd_timeout_sec_ = this->get_parameter("cmd_timeout_sec").as_double();
   
@@ -48,8 +41,8 @@ ControlNode::ControlNode(const rclcpp::NodeOptions & options)
   last_cmd_time_ = this->now();
   
   RCLCPP_INFO(this->get_logger(), 
-    "Control Node initialized - max_accel: %.2f, max_steering: %.2f rad",
-    max_acceleration_, max_steering_angle_);
+    "Control Node initialized - max_speed: %.2f, max_steering: %.2f rad",
+    max_speed_, max_steering_angle_);
 }
 
 void ControlNode::twistCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
@@ -83,48 +76,26 @@ void ControlNode::convertTwistToAckermann(const geometry_msgs::msg::Twist& twist
     // Turning in place - use maximum steering
     steering_angle = (angular_vel > 0) ? max_steering_angle_ : -max_steering_angle_;
   }
-  
-  // Calculate acceleration from velocity change
-  double dt = 0.1;  // Assume 10Hz commands
-  double target_velocity = linear_vel;
-  double acceleration = (target_velocity - current_velocity_) / dt;
-  
-  sendCommand(acceleration, steering_angle);
+
+  sendCommand(linear_vel, steering_angle);
 }
 
-void ControlNode::sendCommand(double acceleration, double steering_angle)
+void ControlNode::sendCommand(double speed, double steering_angle)
 {
   // Apply acceleration limits
-  acceleration = std::max(-max_deceleration_, 
-                          std::min(max_acceleration_, acceleration));
+  speed = std::max(-max_speed_, 
+                          std::min(max_speed_, speed));
   
   // Apply steering angle limits
   steering_angle = std::max(-max_steering_angle_, 
                            std::min(max_steering_angle_, steering_angle));
   
-  // Apply steering rate limit
-  double dt = 0.02;  // 50Hz update rate
-  double max_steering_change = max_steering_rate_ * dt;
-  double steering_diff = steering_angle - current_steering_;
-  
-  if (std::abs(steering_diff) > max_steering_change) {
-    steering_angle = current_steering_ + 
-                    (steering_diff > 0 ? max_steering_change : -max_steering_change);
-  }
-  
-  // Update current state
-  current_velocity_ += acceleration * dt;
-  current_steering_ = steering_angle;
-  
   // Create and publish Ackermann message
   auto msg = ackermann_msgs::msg::AckermannDriveStamped();
   msg.header.stamp = this->now();
   msg.header.frame_id = "base_link";
-  msg.drive.speed = current_velocity_;
-  msg.drive.acceleration = acceleration;
+  msg.drive.speed = speed;
   msg.drive.steering_angle = steering_angle;
-  msg.drive.steering_angle_velocity = (steering_diff / dt);
-  
   ackermann_pub_->publish(msg);
 }
 
@@ -134,10 +105,8 @@ void ControlNode::timeoutCallback()
   
   if (time_since_cmd > cmd_timeout_sec_) {
     // Emergency stop
-    if (std::abs(current_velocity_) > 0.01 || std::abs(current_steering_) > 0.01) {
-      RCLCPP_WARN(this->get_logger(), "Command timeout - emergency stop!");
-      sendCommand(-max_deceleration_, 0.0);
-    }
+    //RCLCPP_WARN(this->get_logger(), "Command timeout - emergency stop!");
+    //sendCommand(0.0, 0.0);
   }
 }
 

@@ -15,11 +15,13 @@ SerialManagerNode::SerialManagerNode(const rclcpp::NodeOptions & options)
   this->declare_parameter("serial_port", "/dev/ttyACM0");
   this->declare_parameter("baud_rate", 115200);
   this->declare_parameter("serial_timeout_sec", 2.0);
+  this->declare_parameter("wheel_circumference", 0.3078);
   
   // Get parameters
   serial_port_name_ = this->get_parameter("serial_port").as_string();
   baud_rate_ = this->get_parameter("baud_rate").as_int();
   serial_timeout_sec_ = this->get_parameter("serial_timeout_sec").as_double();
+  wheel_circumference_ = this->get_parameter("wheel_circumference").as_double();
 
     // Create publisher for wheel data
   wheel_data_pub_ = this->create_publisher<std_msgs::msg::Float32MultiArray>(
@@ -102,19 +104,6 @@ bool SerialManagerNode::initializeSerial()
 void SerialManagerNode::resetESP32()
 {
     RCLCPP_INFO(this->get_logger(), "Resetting ESP32...");
-    /*
-    // Use DTR/RTS for auto-reset (standard on ESP32 dev boards)
-    serial_port_->set_option(boost::asio::serial_port_base::dtr(false));
-    serial_port_->set_option(boost::asio::serial_port_base::rts(true));
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    
-    serial_port_->set_option(boost::asio::serial_port_base::dtr(false));
-    serial_port_->set_option(boost::asio::serial_port_base::rts(false));
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    
-    serial_port_->set_option(boost::asio::serial_port_base::dtr(true));
-    serial_port_->set_option(boost::asio::serial_port_base::rts(false));
-    */
 
     int fd = serial_port_->native_handle();
     if (fd == -1) {
@@ -226,20 +215,23 @@ void SerialManagerNode::controlCommandCallback(
   const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg)
 {
   // Send control command to ESP32
-  sendCommandToESP32(msg->drive.acceleration, msg->drive.steering_angle);
+  sendCommandToESP32(msg->drive.speed, msg->drive.steering_angle);
 }
 
-void SerialManagerNode::sendCommandToESP32(double acceleration, double steering_angle)
+void SerialManagerNode::sendCommandToESP32(double speed, double steering_angle)
 {
   if (!connection_established_) {
     RCLCPP_WARN(this->get_logger(), "Cannot send command - no ESP32 connection");
     return;
   }
+
+  double rps = speed / wheel_circumference_;
+  steering_angle = -steering_angle * (180.0 / M_PI);
   
   // Format command: "A:acceleration,S:steering_angle\n"
   std::stringstream ss;
   ss << std::fixed << std::setprecision(3);
-  ss << "A:" << acceleration << ",S:" << steering_angle << "\n";
+  ss << "<" << rps << "," << steering_angle << ">" << "\n";
   
   std::string command = ss.str();
   

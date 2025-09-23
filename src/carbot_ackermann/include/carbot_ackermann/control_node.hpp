@@ -38,15 +38,9 @@ private:
   rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr ackermann_sub_;
   
   // Control parameters
-  double max_acceleration_;
-  double max_deceleration_;
   double max_steering_angle_;
-  double max_steering_rate_;
+  double max_speed_;
   double wheelbase_;
-  
-  // Current command state
-  double current_velocity_;
-  double current_steering_;
   
   // Time tracking
   rclcpp::Time last_cmd_time_;

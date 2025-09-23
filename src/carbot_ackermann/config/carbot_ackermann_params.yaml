@@ -4,14 +4,15 @@ serial_manager:
     serial_port: "/dev/ttyACM0"       # Serial port for ESP32
     baud_rate: 115200                 # Baud rate
     serial_timeout_sec: 2.0           # Timeout before attempting reconnection
+    wheel_circumference: 0.3078       # Used to decode from the esp32. 
 
 # Odometry Node Parameters  
 odometry_node:
   ros__parameters:
     # Vehicle geometry
-    wheelbase:  0.170                    # Distance between front and rear axles (meters)
-    wheel_circumference: 0.3078        # Wheel circumference (meters) = 2*pi*radius
-    steering_angle_max: 436332.6           # Maximum steering angle (radians, ~34 degrees)
+    wheelbase:  0.178                    # Distance between front and rear axles (meters)
+    max_steering_angle: 0.4363326           # Maximum steering angle (radians, ~25 degrees)
+    wheel_circumference: 0.3078       # Used to decode from the esp32.
     
     # Frame configuration
     odom_frame_id: "odom"
@@ -21,14 +22,11 @@ odometry_node:
 # Control Node Parameters
 control_node:
   ros__parameters:
+
     # Motion limits
-    max_acceleration: 1.0             # Maximum acceleration (m/s^2)
-    max_deceleration: 2.0             # Maximum deceleration (m/s^2)
-    max_steering_angle: 0.6           # Maximum steering angle (radians)
-    max_steering_rate: 1.0            # Maximum steering change rate (rad/s)
-    
-    # Vehicle geometry
-    wheelbase: 0.5                    # Must match odometry_node wheelbase
+    wheelbase:  0.178                    # Distance between front and rear axles (meters)
+    max_steering_angle: 0.4363326           # Maximum steering angle (radians, ~25 degrees)
+    max_speed: 1.7
     
     # Safety
     cmd_timeout_sec: 0.5   

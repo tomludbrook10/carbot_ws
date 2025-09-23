@@ -42,7 +42,7 @@ private:
   // Vehicle parameters (loaded from config)
   double wheelbase_;
   double wheel_circumference_;
-  double steering_angle_max_;
+  double max_steering_angle_;
   
   // Odometry state
   double x_;

@@ -14,9 +14,9 @@ OdometryNode::OdometryNode(const rclcpp::NodeOptions & options)
   first_message_(true)
 {
   // Declare parameters - these will be loaded from config file
-  this->declare_parameter("wheelbase", 0.170);
+  this->declare_parameter("wheelbase", 0.178);
   this->declare_parameter("wheel_circumference", 0.3078);  // 2*pi*r for r=0.1m
-  this->declare_parameter("steering_angle_max", 0.436332);
+  this->declare_parameter("max_steering_angle", 0.436332);
   this->declare_parameter("odom_frame_id", "odom");
   this->declare_parameter("base_frame_id", "base_link");
   this->declare_parameter("publish_tf", false);
@@ -24,7 +24,7 @@ OdometryNode::OdometryNode(const rclcpp::NodeOptions & options)
   // Get parameters
   wheelbase_ = this->get_parameter("wheelbase").as_double();
   wheel_circumference_ = this->get_parameter("wheel_circumference").as_double();
-  steering_angle_max_ = this->get_parameter("steering_angle_max").as_double();
+  max_steering_angle_ = this->get_parameter("max_steering_angle").as_double();
   odom_frame_id_ = this->get_parameter("odom_frame_id").as_string();
   base_frame_id_ = this->get_parameter("base_frame_id").as_string();
   publish_tf_ = this->get_parameter("publish_tf").as_bool();
@@ -86,8 +86,8 @@ void OdometryNode::computeOdometry(double rps, double steering_angle)
   double velocity = rps * wheel_circumference_;  // m/s
   
   // Clamp steering angle
-  steering_angle = std::max(-steering_angle_max_, 
-                           std::min(steering_angle_max_, steering_angle));
+  steering_angle = std::max(-max_steering_angle_, 
+                           std::min(max_steering_angle_, steering_angle));
   
   // Update velocities
   vx_ = velocity;

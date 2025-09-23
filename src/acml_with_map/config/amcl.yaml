@@ -4,6 +4,7 @@ amcl:
   ros__parameters:
     # Use real time (not simulation)
     use_sim_time: false
+    initial_pose_publish_period: 0.1
     
     # Particle filter parameters
     min_particles: 500
@@ -41,7 +42,7 @@ amcl:
     
     # Minimum movement before filter update
     update_min_d: 0.1  # meters
-    update_min_a: 0.2  # radians (~11 degrees)
+    update_min_a: 0.1  # radians
     
     # Laser parameters
     laser_max_range: 12.0  # Maximum range to consider

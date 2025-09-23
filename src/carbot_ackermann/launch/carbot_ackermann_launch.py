@@ -52,6 +52,17 @@ def generate_launch_description():
         respawn_delay=2.0
     )
 
+     # Control Node - starts after Serial Manager
+    control_node = Node(
+        package='carbot_ackermann',
+        executable='control_node',
+        name='control_node',
+        output='screen',
+        parameters=[LaunchConfiguration('config_file')],
+        respawn=True,
+        respawn_delay=2.0
+    )
+
     ## imu node 
     imu_node = Node(
         package='imu_sensor',
@@ -86,6 +97,6 @@ def generate_launch_description():
         serial_manager_node,
         odometry_node,
         imu_node,
-        robot_localization_node
-        #control_node
+        robot_localization_node,
+        control_node
     ])
