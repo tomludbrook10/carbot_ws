@@ -9,10 +9,10 @@
 #include <atomic>
 
 #include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/float32_multi_array.hpp"
 #include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
 #include <boost/asio.hpp>
 #include <boost/asio/serial_port.hpp>
+#include "carbot_ackermann/msg/odometry_data.hpp"
 
 namespace ackermann_robot
 {
@@ -24,9 +24,22 @@ public:
   ~SerialManagerNode();
 
 private:
+  // timer sync
+  static constexpr int SYNC_GPIO = 17;
+  static constexpr int PULSE_WIDTH_US = 10; // 10 mirco seconds
+  bool gpio_initialized_ = false;
+  std::atomic<uint64_t> reference_time_;
+  rclcpp::TimerBase::SharedPtr timer_;
+
+  void setupGPIO();
+  void send_pulse();
+
+  void reset_timer();
+
   // Serial communication methods
   bool initializeSerial();
   void resetESP32();
+  void syncESP32Clock();
   void serialReadThread();
   void processIncomingData(const std::string& data);
   void sendCommandToESP32(double acceleration, double steering_angle);
@@ -38,7 +51,7 @@ private:
   void watchdogCallback();
 
   // Publishers - publishes raw wheel data from ESP32
-  rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr wheel_data_pub_;
+  rclcpp::Publisher<carbot_ackermann::msg::OdometryData>::SharedPtr wheel_data_pub_;
   
   // Subscribers - receives control commands
   rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr control_cmd_sub_;
