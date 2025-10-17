@@ -10,7 +10,7 @@ ControlNode::ControlNode(const rclcpp::NodeOptions & options)
 : Node("control_node", options) {
   // Declare parameters
   this->declare_parameter("max_steering_angle", 0.4363326);   // radians
-  this->declare_parameter("max_speed", 1.7);
+  this->declare_parameter("max_speed", 2.0);
   this->declare_parameter("wheelbase", 0.178);            // meters
   this->declare_parameter("cmd_timeout_sec", 0.5);      // seconds
   
@@ -56,7 +56,7 @@ void ControlNode::ackermannCallback(
   const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg)
 {
   // Forward Ackermann command with safety limits
-  sendCommand(msg->drive.acceleration, msg->drive.steering_angle);
+  sendCommand(msg->drive.speed, msg->drive.steering_angle);
   last_cmd_time_ = this->now();
 }
 

@@ -14,56 +14,75 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(ackermann_msgs REQUIRED)
 find_package(tf2 REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system thread)
 
-# Generate messages
+# Generate custom message.
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/OdometryData.msg"
   DEPENDENCIES std_msgs
 )
 
-# Find Boost for serial communication
-find_package(Boost REQUIRED COMPONENTS system thread)
-
-# DON'T use find_package(pigpio) - use find_library instead:
-find_library(PIGPIO_LIBRARY 
-  NAMES pigpio
-  HINTS /usr/local/lib
+######################################
+# Create and Find Libraries
+######################################
+find_library(JETGPIO_LIBRARY 
+  NAMES jetgpio
+  HINTS /home/tom/JETGPIO
 )
 
-if(NOT PIGPIO_LIBRARY)
-  message(FATAL_ERROR "pigpio library not found")
+if(NOT JETGPIO_LIBRARY)
+  message(FATAL_ERROR "jetgpio library not found")
 endif()
 
-message(STATUS "Found pigpio: ${PIGPIO_LIBRARY}")
+message(STATUS "Found jetgpio: ${JETGPIO_LIBRARY}")
 
-# Find threads (required by pigpio)
-find_package(Threads REQUIRED)
+# Create MPU6050 library
+add_library(mpu6050_lib src/MPU6050.cpp)
+target_include_directories(mpu6050_lib PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_link_libraries(mpu6050_lib ${JETGPIO_LIBRARY})
+
 
 # Include directories
 include_directories(
   include
   ${Boost_INCLUDE_DIRS}
-  /usr/local/include
-  )
+  /usr/local/include)
 
+######################################
+# IMU Publisher node.
+######################################
+add_executable(imu_publisher src/imu_publisher_node.cpp)
+target_link_libraries(imu_publisher mpu6050_lib)
+ament_target_dependencies(imu_publisher
+  rclcpp
+  sensor_msgs
+  geometry_msgs
+  tf2
+  tf2_geometry_msgs
+)
+
+
+######################################
 # Serial Manager Node
+######################################
 add_executable(serial_manager_node 
   src/serial_manager_node.cpp
 )
 
 target_compile_features(serial_manager_node PUBLIC c_std_99 cxx_std_17)
 
-
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(serial_manager_node
   ${Boost_LIBRARIES}
-  ${PIGPIO_LIBRARY}
+  ${JETGPIO_LIBRARY}
   "${cpp_typesupport_target}"
 )
-
 
 ament_target_dependencies(serial_manager_node
   rclcpp
@@ -71,7 +90,11 @@ ament_target_dependencies(serial_manager_node
   ackermann_msgs
 )
 
+
+######################################
 # Odometry Node
+######################################
+
 add_executable(odometry_node 
   src/odometry_node.cpp
 )
@@ -79,7 +102,6 @@ add_executable(odometry_node
 target_link_libraries(odometry_node 
   "${cpp_typesupport_target}"
 )
-
 
 target_compile_features(odometry_node PUBLIC c_std_99 cxx_std_17)
 ament_target_dependencies(odometry_node
@@ -91,7 +113,10 @@ ament_target_dependencies(odometry_node
   tf2_geometry_msgs
 )
 
+######################################
 # Control Node
+######################################
+
 add_executable(control_node 
   src/control_node.cpp
 )
@@ -103,12 +128,19 @@ ament_target_dependencies(control_node
   ackermann_msgs
 )
 
+
 # Install executables
 install(TARGETS
   serial_manager_node
   odometry_node
   control_node
+  imu_publisher
   DESTINATION lib/${PROJECT_NAME}
+)
+
+install(TARGETS 
+  mpu6050_lib
+  LIBRARY  DESTINATION lib
 )
 
 # Install header files

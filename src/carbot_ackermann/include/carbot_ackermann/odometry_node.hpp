@@ -11,6 +11,7 @@
 #include "tf2_ros/transform_broadcaster.h"
 #include "tf2/LinearMath/Quaternion.h"
 #include "geometry_msgs/msg/transform_stamped.hpp"
+#include "carbot_ackermann/msg/odometry_data.hpp"
 
 namespace ackermann_robot
 {
@@ -22,19 +23,19 @@ public:
 
 private:
   // Callback for wheel data from serial manager
-  void wheelDataCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg);
+  void wheelDataCallback(const carbot_ackermann::msg::OdometryData::SharedPtr msg);
   
   // Compute odometry using Ackermann model
-  void computeOdometry(double rps, double steering_angle);
+  void computeOdometry(const rclcpp::Time& current_time, const double rps, double steering_angle);
   
   // Publish odometry and TF
-  void publishOdometry();
+  void publishOdometry(const rclcpp::Time& current_time);
 
   // Publishers
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   
   // Subscribers
-  rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr wheel_data_sub_;
+  rclcpp::Subscription<carbot_ackermann::msg::OdometryData>::SharedPtr wheel_data_sub_;
   
   // TF broadcaster
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
@@ -52,7 +53,7 @@ private:
   double vth_;
   
   // Time tracking
-  rclcpp::Time prev_time_;
+  int64_t prev_time_;
   bool first_message_;
   
   // Frame IDs

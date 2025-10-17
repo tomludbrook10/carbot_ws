@@ -1,4 +1,5 @@
 #include "carbot_ackermann/odometry_node.hpp"
+#include "carbot_ackermann/msg/odometry_data.hpp"
 #include <cmath>
 
 namespace ackermann_robot
@@ -30,10 +31,10 @@ OdometryNode::OdometryNode(const rclcpp::NodeOptions & options)
   publish_tf_ = this->get_parameter("publish_tf").as_bool();
   
   // Create publisher
-  odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("demo/odom", 10);
+  odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("wheel_odom", 10);
   
   // Create subscriber
-  wheel_data_sub_ = this->create_subscription<std_msgs::msg::Float32MultiArray>(
+  wheel_data_sub_ = this->create_subscription<carbot_ackermann::msg::OdometryData>(
     "wheel_feedback", 10,
     std::bind(&OdometryNode::wheelDataCallback, this, std::placeholders::_1));
   
@@ -42,42 +43,34 @@ OdometryNode::OdometryNode(const rclcpp::NodeOptions & options)
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(this);
   }
   
-  prev_time_ = this->now();
-  
   RCLCPP_INFO(this->get_logger(), 
     "Odometry Node initialized - wheelbase: %.3fm, wheel_circumference: %.3fm",
     wheelbase_, wheel_circumference_);
 }
 
-void OdometryNode::wheelDataCallback(const std_msgs::msg::Float32MultiArray::SharedPtr msg)
+void OdometryNode::wheelDataCallback(const carbot_ackermann::msg::OdometryData::SharedPtr msg)
 {
-  if (msg->data.size() < 2) {
-    RCLCPP_WARN(this->get_logger(), "Invalid wheel data message");
-    return;
-  }
-  
-  double rps = msg->data[0];  // Revolutions per second
   
   // the angle need to be flipped as it's not using right hand rule. 
   // also angle get converted to radians.
-  double steering_angle = -(msg->data[1] * (M_PI / 180.0)); // Radians
-  
-  computeOdometry(rps, steering_angle);
-  publishOdometry();
+  double steering_angle_in_rads = -(msg->steering_angle * (M_PI / 180.0)); // Radians
+
+  computeOdometry(msg->header.stamp, msg->rps,  steering_angle_in_rads);
+  publishOdometry(msg->header.stamp);
 }
 
-void OdometryNode::computeOdometry(double rps, double steering_angle)
+void OdometryNode::computeOdometry(const rclcpp::Time& current_time, const double rps, double steering_angle)
 {
-  auto current_time = this->now();
-  
+  int64_t current_time_nano = current_time.nanoseconds();
+
   if (first_message_) {
-    prev_time_ = current_time;
+    prev_time_ = current_time_nano;
     first_message_ = false;
     return;
   }
   
   // Calculate time delta
-  double dt = (current_time - prev_time_).seconds();
+  double dt =  static_cast<double>((current_time_nano - prev_time_)) / 1000000000.0;
   if (dt <= 0.0) {
     return;
   }
@@ -124,13 +117,11 @@ void OdometryNode::computeOdometry(double rps, double steering_angle)
   while (theta_ > M_PI) theta_ -= 2.0 * M_PI;
   while (theta_ < -M_PI) theta_ += 2.0 * M_PI;
   
-  prev_time_ = current_time;
+  prev_time_ = current_time_nano;
 }
 
-void OdometryNode::publishOdometry()
+void OdometryNode::publishOdometry(const rclcpp::Time& current_time)
 {
-  auto current_time = this->now();
-  
   // Create quaternion from yaw
   tf2::Quaternion q;
   q.setRPY(0, 0, theta_);

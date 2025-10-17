@@ -71,7 +71,7 @@ class SimplePurePursuitFollower(Node):
             10
         )
 
-         # Subscribers for contro
+        # Subscribers for contro
         # Publishers
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.status_pub = self.create_publisher(String, '/follower_status', 10)

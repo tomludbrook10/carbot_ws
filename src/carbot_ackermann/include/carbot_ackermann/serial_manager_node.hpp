@@ -25,7 +25,7 @@ public:
 
 private:
   // timer sync
-  static constexpr int SYNC_GPIO = 17;
+  static constexpr int SYNC_GPIO = 7;
   static constexpr int PULSE_WIDTH_US = 10; // 10 mirco seconds
   bool gpio_initialized_ = false;
   std::atomic<uint64_t> reference_time_;
