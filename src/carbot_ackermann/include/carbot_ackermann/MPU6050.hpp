@@ -37,7 +37,7 @@ public:
      * Calibrate gyroscope (sensor should be stationary)
      * @param N Number of calibration samples
      */
-    void calibrateGyro(const int sample_freq, const int N = 500);
+    void calibrateGyro(const int N = 500);
     
     /**
      * Run complementary filter to update orientation

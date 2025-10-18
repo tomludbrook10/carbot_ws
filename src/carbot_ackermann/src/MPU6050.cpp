@@ -116,14 +116,16 @@ bool MPU6050::setUp() {
         std::cerr << "Failed to configure gyroscope" << std::endl;
         return false;
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    std::cout << "MPU6050 is sleeping for 4 seconds" << std::endl;
+
+    std::this_thread::sleep_for(std::chrono::seconds(4));
     
     std::cout << "MPU6050 set up:" << std::endl;
     std::cout << "\tAccelerometer: 0x" << std::hex << accHex << std::dec 
               << " Scale: " << accScaleFactor << std::endl;
     std::cout << "\tGyroscope: 0x" << std::hex << gyroHex << std::dec 
               << " Scale: " << gyroScaleFactor << std::endl;
-    
     return true;
 }
 
@@ -155,7 +157,7 @@ void MPU6050::getRawData() {
     az = readWord(ACCEL_ZOUT_H);
 }
 
-void MPU6050::calibrateGyro(const int sample_freq, const int N) {
+void MPU6050::calibrateGyro(const int N) {
     std::cout << "Calibrating gyroscope with " << N << " points. Do not move!" << std::endl;
     
     // Reset calibration values

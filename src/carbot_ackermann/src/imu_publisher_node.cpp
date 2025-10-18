@@ -23,7 +23,7 @@ ImuPublisher::ImuPublisher() : Node("imu_publisher")
     
     // Initialize MPU6050
     // Parameters: gyro sensitivity (250 deg/s), acc sensitivity (2g), tau (0.98)
-    mpu_ = std::make_unique<MPU6050>(250, 2, 0.98);
+    mpu_ = std::make_unique<MPU6050>(500, 2, 0.98);
     
     // Set up sensor
     if (!mpu_->setUp()) {
@@ -33,7 +33,7 @@ ImuPublisher::ImuPublisher() : Node("imu_publisher")
     }
     
     // Calibrate gyroscope with 500 samples
-    mpu_->calibrateGyro(sample_freq_, 100);
+    mpu_->calibrateGyro(2000);
     
     // Initialize covariance matrices
     initializeCovarianceMatrices();
@@ -43,7 +43,7 @@ ImuPublisher::ImuPublisher() : Node("imu_publisher")
         std::chrono::milliseconds(sample_freq_),
         std::bind(&ImuPublisher::publishImu, this));
     
-    RCLCPP_INFO(this->get_logger(), "IMU Publisher initialized and running at 10 Hz");
+    RCLCPP_INFO(this->get_logger(), "IMU Publisher initialized and running at 20 Hz");
 }
 
 
@@ -53,8 +53,10 @@ void ImuPublisher::initializeCovarianceMatrices() {
     std::array<double, 9> orientation_cov = {
         0.001, 0.0,   0.0,
         0.0,   0.001, 0.0,
-        0.0,   0.0,   0.01
+        0.0,   0.0,   0.001
     };
+    // note that I'm only really using yaw, so none of this is used for the ekf.
+
     
     // Angular velocity covariance in (rad/s)^2
     // MPU6050 gyro noise: ~0.005 deg/s/√Hz
