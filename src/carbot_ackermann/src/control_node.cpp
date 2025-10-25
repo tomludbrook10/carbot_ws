@@ -83,8 +83,8 @@ void ControlNode::convertTwistToAckermann(const geometry_msgs::msg::Twist& twist
 void ControlNode::sendCommand(double speed, double steering_angle)
 {
   // Apply acceleration limits
-  speed = std::max(-max_speed_, 
-                          std::min(max_speed_, speed));
+//  speed = std::max(-max_speed_, 
+  //                        std::min(max_speed_, speed));
   
   // Apply steering angle limits
   steering_angle = std::max(-max_steering_angle_, 

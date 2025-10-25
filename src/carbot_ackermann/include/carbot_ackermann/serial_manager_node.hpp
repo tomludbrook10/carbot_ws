@@ -42,7 +42,7 @@ private:
   void syncESP32Clock();
   void serialReadThread();
   void processIncomingData(const std::string& data);
-  void sendCommandToESP32(double acceleration, double steering_angle);
+  void sendCommandToESP32(float speed, float steering_angle);
   
   // Callback for control commands
   void controlCommandCallback(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg);

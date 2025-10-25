@@ -37,9 +37,9 @@ SerialManagerNode::SerialManagerNode(const rclcpp::NodeOptions & options)
     std::bind(&SerialManagerNode::controlCommandCallback, this, std::placeholders::_1));
   
   // Create watchdog timer
-  watchdog_timer_ = this->create_wall_timer(
-    std::chrono::seconds(1),
-    std::bind(&SerialManagerNode::watchdogCallback, this));
+  // watchdog_timer_ = this->create_wall_timer(
+  //   std::chrono::seconds(1),
+  //   std::bind(&SerialManagerNode::watchdogCallback, this));
   
   last_serial_msg_time_ = this->now();
 
@@ -303,7 +303,7 @@ void SerialManagerNode::controlCommandCallback(
   sendCommandToESP32(msg->drive.speed, msg->drive.steering_angle);
 }
 
-void SerialManagerNode::sendCommandToESP32(double speed, double steering_angle)
+void SerialManagerNode::sendCommandToESP32(float speed, float steering_angle)
 {
   /// takes speed in m/s and steering angle in radius and makes a converstion to robots rsp and steerrign angle in degrees.
 
@@ -311,14 +311,14 @@ void SerialManagerNode::sendCommandToESP32(double speed, double steering_angle)
     RCLCPP_WARN(this->get_logger(), "Cannot send command - no ESP32 connection");
     return;
   }
-
-  double rps = speed / wheel_circumference_;
-  steering_angle = -steering_angle * (180.0 / M_PI);
+  
+  float rps = speed / wheel_circumference_;
+  int steering_angle_output = static_cast<int>(-steering_angle * (180.0 / M_PI));
   
   // Format command: "A:acceleration,S:steering_angle\n"
   std::stringstream ss;
-  ss << std::fixed << std::setprecision(3);
-  ss << "<" << rps << "," << steering_angle << ">" << "\n";
+  ss << std::fixed << std::setprecision(1);
+  ss << "<" << rps << "," << steering_angle_output << ">" << "\n";
   
   std::string command = ss.str();
   

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.8)
 project(teleop)
 
+list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/.local")
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
@@ -14,8 +16,9 @@ find_package(ackermann_msgs REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-include_directories(include)
+find_package(carbot_server_lib REQUIRED)
 
+include_directories(include)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -30,6 +33,7 @@ if(BUILD_TESTING)
 endif()
 
 add_executable(keyboard_teleop src/keyboard_teleop.cpp)
+target_link_libraries(keyboard_teleop carbot_server_lib::carbot_server_lib)
 ament_target_dependencies(keyboard_teleop rclcpp ackermann_msgs)
 install(TARGETS keyboard_teleop DESTINATION lib/${PROJECT_NAME})
 
