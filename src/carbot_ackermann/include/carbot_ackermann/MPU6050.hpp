@@ -17,61 +17,15 @@ public:
     /**
      * Constructor
      * @param gyro Gyroscope sensitivity (250, 500, 1000, 2000 deg/s)
-     * @param acc Accelerometer sensitivity (2, 4, 8, 16 g)
-     * @param tau Complementary filter coefficient (0-1, typically 0.98)
      */
-    MPU6050(int gyro = 250, int acc = 2, float tau = 0.98);
-    
-    /**
-     * Destructor - closes I2C connection
-     */
+    MPU6050(int gyro = 250);
     ~MPU6050();
-    
-    /**
-     * Initialize the MPU6050 sensor
-     * @return true if successful, false otherwise
-     */
+
     bool setUp();
-    
-    /**
-     * Calibrate gyroscope (sensor should be stationary)
-     * @param N Number of calibration samples
-     */
     void calibrateGyro(const int N = 500);
-    
-    /**
-     * Run complementary filter to update orientation
-     */
-    void compFilter();
-    
-    /**
-     * Get current roll angle in degrees
-     */
-    float getRoll() const { return roll; }
-    
-    /**
-     * Get current pitch angle in degrees
-     */
-    float getPitch() const { return pitch; }
-    
-    /**
-     * Get current yaw angle in degrees
-     */
-    float getYaw() const { return yaw; }
-    
-    /**
-     * Get gyroscope readings in deg/s
-     */
-    void getGyro(float& gx_out, float& gy_out, float& gz_out) const {
-        gx_out = gx; gy_out = gy; gz_out = gz;
-    }
-    
-    /**
-     * Get accelerometer readings in g
-     */
-    void getAccel(float& ax_out, float& ay_out, float& az_out) const {
-        ax_out = ax; ay_out = ay; az_out = az;
-    }
+    void processYaw();
+
+    float getYaw() const { return yaw_ema; }
 
 private:
     // MPU6050 register addresses
@@ -86,37 +40,32 @@ private:
     static const int ACCEL_YOUT_H = 0x3D;
     static const int ACCEL_ZOUT_H = 0x3F;
     
-    // I2C handle
-    int i2cHandle;
+    // I2C handle   
+    int i2c_handle_;
     
     // Sensor configuration
-    float gyroScaleFactor;
-    int gyroHex;
-    float accScaleFactor;
-    int accHex;
-    float tau;
+    double gyro_scale_factor_;
+    int gyro_hex_;
     
-    // Raw sensor data
-    float gx, gy, gz;  // Gyroscope data (deg/s)
-    float ax, ay, az;  // Accelerometer data (g)
-    
+    // current ema yaw.
+    double yaw_ema;
+    double yaw;
+
+    // ema values.
+    const int N_ = 5;
+    const double alpha_ = 2.0 / (N_ + 1);
+
     // Calibration offsets
-    float gyroXcal, gyroYcal, gyroZcal;
-    
-    // Orientation angles
-    float roll, pitch, yaw;
-    float gyroRoll, gyroPitch, gyroYaw;
-    
+    double gyro_z_cal_;
+
     // Timing for integration
-    std::chrono::high_resolution_clock::time_point dtTimer;
+    std::chrono::high_resolution_clock::time_point prev_time_;
     
     // Helper functions
     void gyroSensitivity(int sensitivity);
-    void accelerometerSensitivity(int sensitivity);
     int readWord(int reg);
-    void getRawData();
-    void processIMUvalues();
     double getElapsedTime();
+    
 };
 
 #endif // MPU6050_HPP

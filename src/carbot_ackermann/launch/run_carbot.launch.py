@@ -9,6 +9,7 @@ from launch_ros.substitutions import FindPackageShare
 from launch.conditions import IfCondition
 from launch.actions import RegisterEventHandler
 from launch.event_handlers import OnProcessExit
+from launch.actions import EmitEvent
 
 def generate_launch_description():
     # Find package directory
@@ -29,40 +30,16 @@ def generate_launch_description():
         description='Use simulation time'
     )
     
-    # Serial Manager Node - MUST start successfully
     serial_manager_node = Node(
         package='carbot_ackermann',
         executable='serial_manager_node',
         name='serial_manager',
         output='screen',
         parameters=[LaunchConfiguration('config_file')],
-        on_exit=Shutdown(),  # If serial manager fails, shutdown everything
+        on_exit=[EmitEvent(event=Shutdown())],
         respawn=False,
         emulate_tty=True
     )
-    
-    # Odometry Node - starts after Serial Manager
-    odometry_node = Node(
-        package='carbot_ackermann',
-        executable='odometry_node',
-        name='odometry_node',
-        output='screen',
-        parameters=[LaunchConfiguration('config_file')],
-        respawn=True,
-        respawn_delay=2.0
-    )
-
-     # Control Node - starts after Serial Manager
-    control_node = Node(
-        package='carbot_ackermann',
-        executable='control_node',
-        name='control_node',
-        output='screen',
-        parameters=[LaunchConfiguration('config_file')],
-        respawn=True,
-        respawn_delay=2.0
-    )
-
 
      # Control Node - starts after Serial Manager
     imu_publisher_node = Node(
@@ -75,14 +52,13 @@ def generate_launch_description():
         respawn_delay=2.0
     )
 
-
-    robot_localization_node = Node(
-        package='robot_localization',
-        executable='ekf_node',
-        name='ekf_node',
+    ekf_node = Node(
+        package='carbot_ackermann',
+        executable='ackermann_ekf_node',
+        name='ackermann_ekf_node',
         output='screen',
-        parameters=[os.path.join(pkg_share, 'config/ekf.yaml'), 
-        {'use_sim_time': LaunchConfiguration('use_sim_time')}]
+        parameters=[LaunchConfiguration('config_file')],
+        respawn=False,
     )
 
     return LaunchDescription([
@@ -92,8 +68,6 @@ def generate_launch_description():
         
         # Nodes - Serial Manager starts first and must succeed
         serial_manager_node,
-        odometry_node,
-        control_node,
         imu_publisher_node,
-        robot_localization_node
+        ekf_node
     ])

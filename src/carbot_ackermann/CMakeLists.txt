@@ -10,21 +10,21 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(nav_msgs REQUIRED)
-find_package(ackermann_msgs REQUIRED)
-find_package(tf2 REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(tf2_ros REQUIRED)
-find_package(tf2_geometry_msgs REQUIRED)
+find_package(Eigen3 REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system thread)
 
+
 # Generate custom message.
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/ImuData.msg"
   "msg/OdometryData.msg"
+  "msg/ControlCommand.msg"
+  "msg/Pose.msg"
   DEPENDENCIES std_msgs
 )
+
+ament_export_dependencies(rosidl_default_runtime)
 
 ######################################
 # Create and Find Libraries
@@ -54,19 +54,21 @@ include_directories(
   ${Boost_INCLUDE_DIRS}
   /usr/local/include)
 
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 ######################################
 # IMU Publisher node.
 ######################################
+
 add_executable(imu_publisher src/imu_publisher_node.cpp)
-target_link_libraries(imu_publisher mpu6050_lib)
+target_link_libraries(imu_publisher 
+    mpu6050_lib 
+  "${cpp_typesupport_target}"
+)
 ament_target_dependencies(imu_publisher
   rclcpp
-  sensor_msgs
-  geometry_msgs
-  tf2
-  tf2_geometry_msgs
+  std_msgs
 )
-
 
 ######################################
 # Serial Manager Node
@@ -77,7 +79,6 @@ add_executable(serial_manager_node
 
 target_compile_features(serial_manager_node PUBLIC c_std_99 cxx_std_17)
 
-rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(serial_manager_node
   ${Boost_LIBRARIES}
   ${JETGPIO_LIBRARY}
@@ -87,54 +88,30 @@ target_link_libraries(serial_manager_node
 ament_target_dependencies(serial_manager_node
   rclcpp
   std_msgs
-  ackermann_msgs
 )
 
-
 ######################################
-# Odometry Node
+# Ackermann EKF Node
 ######################################
 
-add_executable(odometry_node 
-  src/odometry_node.cpp
+add_executable(ackermann_ekf_node
+  src/ackermann_ekf.cpp
 )
 
-target_link_libraries(odometry_node 
+target_link_libraries(ackermann_ekf_node
+  Eigen3::Eigen
   "${cpp_typesupport_target}"
 )
-
-target_compile_features(odometry_node PUBLIC c_std_99 cxx_std_17)
-ament_target_dependencies(odometry_node
+ament_target_dependencies(ackermann_ekf_node
   rclcpp
   std_msgs
-  nav_msgs
-  tf2
-  tf2_ros
-  tf2_geometry_msgs
 )
-
-######################################
-# Control Node
-######################################
-
-add_executable(control_node 
-  src/control_node.cpp
-)
-
-target_compile_features(control_node PUBLIC c_std_99 cxx_std_17)
-ament_target_dependencies(control_node
-  rclcpp
-  geometry_msgs
-  ackermann_msgs
-)
-
 
 # Install executables
 install(TARGETS
   serial_manager_node
-  odometry_node
-  control_node
   imu_publisher
+  ackermann_ekf_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

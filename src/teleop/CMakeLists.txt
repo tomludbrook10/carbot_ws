@@ -12,6 +12,8 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(ackermann_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(carbot_ackermann REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -34,7 +36,7 @@ endif()
 
 add_executable(keyboard_teleop src/keyboard_teleop.cpp)
 target_link_libraries(keyboard_teleop carbot_server_lib::carbot_server_lib)
-ament_target_dependencies(keyboard_teleop rclcpp ackermann_msgs)
+ament_target_dependencies(keyboard_teleop rclcpp ackermann_msgs nav_msgs carbot_ackermann std_msgs)
 install(TARGETS keyboard_teleop DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
