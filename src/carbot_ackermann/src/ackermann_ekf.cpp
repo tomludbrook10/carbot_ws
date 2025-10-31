@@ -68,23 +68,11 @@ void AckermannEKF::controlCallback(const carbot_ackermann::msg::ControlCommand::
 }
 
 void AckermannEKF::imuCallback(const carbot_ackermann::msg::ImuData::SharedPtr msg) {
-    {
-        std::unique_lock<std::mutex> lock(imu_mutex_);
-        last_imu_data_.timestamp_in_secs = static_cast<double>(msg->header.stamp.sec) +
-                                           static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
-        last_imu_data_.yaw = msg->yaw;
-    }
-    imu_cv_.notify_one();
+        current_imu_val_.store(static_cast<double>(msg->yaw), std::memory_order_relaxed);
 }
 
 void AckermannEKF::odomCallback(const carbot_ackermann::msg::OdometryData::SharedPtr msg) {
-    {
-        std::unique_lock<std::mutex> lock(odom_mutex_);
-        last_odom_data_.timestamp_in_secs = static_cast<double>(msg->header.stamp.sec) +
-                                            static_cast<double>(msg->header.stamp.nanosec) * 1e-9;
-        last_odom_data_.linear_velocity = msg->linear_velocity;
-    }
-    odom_cv_.notify_one();
+    current_odom_val_.store(static_cast<double>(msg->linear_velocity), std::memory_order_relaxed);
 }
 
 bool AckermannEKF::updateLastestControl() {
@@ -205,9 +193,9 @@ void AckermannEKF::run_ekf_localisation() {
     auto last = std::chrono::steady_clock::now();
 
     while (running_ && rclcpp::ok()) {
-        if (std::chrono::steady_clock::now() - last >= std::chrono::milliseconds(40)) {
-            ekf_localisation();
+        if (std::chrono::steady_clock::now() - last >= std::chrono::milliseconds(50)) {
             last = std::chrono::steady_clock::now();
+            ekf_localisation();
         }
         std::this_thread::sleep_for(std::chrono::microseconds(500));
     }
@@ -215,24 +203,16 @@ void AckermannEKF::run_ekf_localisation() {
 
 
 void AckermannEKF::ekf_localisation() {
-    double yaw = 0.0;
-    double linear_velocity = 0.0;
-
     // obtain u_t. 
     updateLastestControl();
-    {
-        std::unique_lock<std::mutex> imu_lock(imu_mutex_);
-        imu_cv_.wait(imu_lock, [this](){ return last_imu_data_.timestamp_in_secs >= last_control_accumulated_.timestamp_in_secs; });
-        yaw = last_imu_data_.yaw;
-    }
-    {
-        std::unique_lock<std::mutex> odom_lock(odom_mutex_);
-        odom_cv_.wait(odom_lock, [this](){ return last_odom_data_.timestamp_in_secs >= last_control_accumulated_.timestamp_in_secs; });
-        linear_velocity = last_odom_data_.linear_velocity;
-    }
+    double yaw = current_imu_val_.load(std::memory_order_relaxed);
+    double linear_velocity = current_odom_val_.load(std::memory_order_relaxed);
+    double current_time = this->now().seconds();
+    double dt = current_time - prev_control_timestamp_;
+    prev_control_timestamp_ = current_time;
 
-    double dt = last_control_accumulated_.timestamp_in_secs - prev_control_timestamp_;
-    prev_control_timestamp_ = last_control_accumulated_.timestamp_in_secs;
+    //double dt = last_control_accumulated_.timestamp_in_secs - prev_control_timestamp_;
+    //prev_control_timestamp_ = last_control_accumulated_.timestamp_in_secs;
 
 
     // predict step.
@@ -256,7 +236,7 @@ void AckermannEKF::ekf_localisation() {
     pose_msg.linear_velocity = static_cast<float>(prediction_state_(3));
     pose_publisher_->publish(pose_msg);
 
-    if (dt >= 0.07) {
+    if (dt >= 0.06) {
         RCLCPP_WARN(this->get_logger(), "EKF localisation loop is running slowly. dt = %.4f seconds", dt);
     }
     checkCovarianceStability();

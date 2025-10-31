@@ -11,6 +11,7 @@
 #include <condition_variable>
 #include <Eigen/Dense>
 #include <thread>
+#include <atomic>
 
 #define Q_COV_PARAMETER "Q_covariance"
 #define R_COV_PARAMETER "R_covariance"
@@ -68,14 +69,8 @@ private:
     double prev_control_timestamp_ = 0.0;
 
     // imu.
-    Imu last_imu_data_ {0, 0.0};
-    std::mutex imu_mutex_; // guard access to imu data
-    std::condition_variable imu_cv_;
-
-    // odometry
-    Odometry last_odom_data_ {0, 0.0};
-    std::mutex odom_mutex_; // guard access to odometry data
-    std::condition_variable odom_cv_;
+    std::atomic<double> current_imu_val_;
+    std::atomic<double> current_odom_val_;
 
     // carbot parameters
     double WHEELBASE;
