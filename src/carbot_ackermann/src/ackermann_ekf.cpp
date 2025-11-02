@@ -234,6 +234,10 @@ void AckermannEKF::ekf_localisation() {
     pose_msg.y = static_cast<float>(prediction_state_(1));
     pose_msg.yaw = static_cast<float>(prediction_state_(2));
     pose_msg.linear_velocity = static_cast<float>(prediction_state_(3));
+
+    auto monotonic_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    pose_msg.monotonic_timestamp_ns = monotonic_time;
+
     pose_publisher_->publish(pose_msg);
 
     if (dt >= 0.06) {
