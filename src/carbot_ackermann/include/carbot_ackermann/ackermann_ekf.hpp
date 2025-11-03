@@ -44,21 +44,19 @@ struct Control {
 class AckermannEKF : public rclcpp::Node {
 public:
     AckermannEKF();
-    ~AckermannEKF();
-
 private:
     rclcpp::Subscription<carbot_ackermann::msg::ImuData>::SharedPtr imu_subscription_;
     rclcpp::Subscription<carbot_ackermann::msg::OdometryData>::SharedPtr odom_subscription_;
     rclcpp::Subscription<carbot_ackermann::msg::ControlCommand>::SharedPtr control_subscription_;
     rclcpp::Publisher<carbot_ackermann::msg::Pose>::SharedPtr pose_publisher_;
     rclcpp::TimerBase::SharedPtr ekf_timer_;
-    std::thread ekf_thread_;
-    bool running_ = true;
 
     // callbacks
     void imuCallback(const carbot_ackermann::msg::ImuData::SharedPtr msg);
     void odomCallback(const carbot_ackermann::msg::OdometryData::SharedPtr msg);
     void controlCallback(const carbot_ackermann::msg::ControlCommand::SharedPtr msg);
+
+    uint64_t getCurrentTime();
 
     // control_buffer
     int control_buffer_size_;
@@ -66,11 +64,10 @@ private:
     Control last_control_accumulated_ {0, 0.0, 0.0};
     std::mutex control_mutex_; // guard access to control_buffer_ and last_control_accumulated_
     bool updateLastestControl();
-    double prev_control_timestamp_ = 0.0;
+    uint64_t prev_control_timestamp_ = 0;
 
     // imu.
     std::atomic<double> current_imu_val_;
-    std::atomic<double> current_odom_val_;
 
     // carbot parameters
     double WHEELBASE;
@@ -110,8 +107,6 @@ private:
     void checkCovarianceStability();
 
     // called every ~50ms.
-    void run_ekf_localisation();
-    void ekf_localisation();
-    int64_t last_ekf_timestamp_ = 0;
+    void ekf_localisation(const uint64_t current_time_ns,const double linear_velocity);
 
 };

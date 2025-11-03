@@ -1,2 +1,2 @@
-std_msgs/Header header
+uint64 monotonic_timestamp_ns
 float32 linear_velocity

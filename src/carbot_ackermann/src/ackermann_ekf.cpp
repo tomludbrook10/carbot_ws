@@ -40,19 +40,14 @@ AckermannEKF::AckermannEKF() : Node("ackermann_ekf_node") {
 
     control_buffer_.reserve(control_buffer_size_); // preallocate space for control commands
 
-    ekf_thread_ = std::thread(&AckermannEKF::run_ekf_localisation, this);
-
-    prev_control_timestamp_ = this->now().seconds();
+    prev_control_timestamp_ = getCurrentTime();
 
     RCLCPP_INFO(this->get_logger(), "Ackermann EKF node initialized");
     RCLCPP_INFO(this->get_logger(), "Publishing at %d Hz", publish_rate_hz);    
 }
 
-AckermannEKF::~AckermannEKF() {
-    running_ = false;
-    if (ekf_thread_.joinable()) {
-        ekf_thread_.join();
-    }
+uint64_t AckermannEKF::getCurrentTime() {
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
 void AckermannEKF::controlCallback(const carbot_ackermann::msg::ControlCommand::SharedPtr msg) {
@@ -72,7 +67,7 @@ void AckermannEKF::imuCallback(const carbot_ackermann::msg::ImuData::SharedPtr m
 }
 
 void AckermannEKF::odomCallback(const carbot_ackermann::msg::OdometryData::SharedPtr msg) {
-    current_odom_val_.store(static_cast<double>(msg->linear_velocity), std::memory_order_relaxed);
+    ekf_localisation(msg->monotonic_timestamp_ns, static_cast<double>(msg->linear_velocity));
 }
 
 bool AckermannEKF::updateLastestControl() {
@@ -189,31 +184,13 @@ void AckermannEKF::computeFJacobian(const double dt) {
     f_jacobian_(2, 3) = computeKappa() * dt;
 }
 
-void AckermannEKF::run_ekf_localisation() {
-    auto last = std::chrono::steady_clock::now();
 
-    while (running_ && rclcpp::ok()) {
-        if (std::chrono::steady_clock::now() - last >= std::chrono::milliseconds(50)) {
-            last = std::chrono::steady_clock::now();
-            ekf_localisation();
-        }
-        std::this_thread::sleep_for(std::chrono::microseconds(500));
-    }
-}
-
-
-void AckermannEKF::ekf_localisation() {
+void AckermannEKF::ekf_localisation(const uint64_t current_time_ns, const double linear_velocity) {
     // obtain u_t. 
     updateLastestControl();
     double yaw = current_imu_val_.load(std::memory_order_relaxed);
-    double linear_velocity = current_odom_val_.load(std::memory_order_relaxed);
-    double current_time = this->now().seconds();
-    double dt = current_time - prev_control_timestamp_;
-    prev_control_timestamp_ = current_time;
-
-    //double dt = last_control_accumulated_.timestamp_in_secs - prev_control_timestamp_;
-    //prev_control_timestamp_ = last_control_accumulated_.timestamp_in_secs;
-
+    double dt = static_cast<double>(current_time_ns - prev_control_timestamp_) * 1e-9; // in seconds
+    prev_control_timestamp_ = current_time_ns;
 
     // predict step.
     computeFJacobian(dt); // must come first before predictState, since we use correction state at t-1.
@@ -235,12 +212,10 @@ void AckermannEKF::ekf_localisation() {
     pose_msg.yaw = static_cast<float>(prediction_state_(2));
     pose_msg.linear_velocity = static_cast<float>(prediction_state_(3));
 
-    auto monotonic_time = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-    pose_msg.monotonic_timestamp_ns = monotonic_time;
-
+    pose_msg.monotonic_timestamp_ns = current_time_ns;
     pose_publisher_->publish(pose_msg);
 
-    if (dt >= 0.06) {
+    if (dt >= 0.025) {
         RCLCPP_WARN(this->get_logger(), "EKF localisation loop is running slowly. dt = %.4f seconds", dt);
     }
     checkCovarianceStability();

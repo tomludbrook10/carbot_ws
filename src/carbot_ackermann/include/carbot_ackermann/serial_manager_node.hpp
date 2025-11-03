@@ -31,6 +31,9 @@ private:
   std::atomic<uint64_t> reference_time_;
   rclcpp::TimerBase::SharedPtr timer_;
 
+  uint64_t getCurrentTime();
+
+
   void setupGPIO();
   void send_pulse();
 

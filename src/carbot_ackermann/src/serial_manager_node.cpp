@@ -86,9 +86,13 @@ void SerialManagerNode::setupGPIO() {
   RCLCPP_INFO(this->get_logger(), "GPIO initialized on pin %d", SYNC_GPIO);
 }
 
+uint64_t SerialManagerNode::getCurrentTime() {
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 void SerialManagerNode::send_pulse() {
   // Get ROS time just before pulse
-  auto pre_pulse_time = this->now();
+  auto pre_pulse_time = getCurrentTime();
   
   // Send hardware pulse with minimal latency
   gpioWrite(SYNC_GPIO, 1);
@@ -96,20 +100,14 @@ void SerialManagerNode::send_pulse() {
   gpioWrite(SYNC_GPIO, 0);
   
   // Get ROS time just after pulse
-  auto post_pulse_time = this->now();
-  
-  auto interpolated_time = (pre_pulse_time.nanoseconds() + post_pulse_time.nanoseconds()) / 2;
+  auto post_pulse_time = getCurrentTime();
+
+  auto interpolated_time = (pre_pulse_time + post_pulse_time) / 2;
   // Calculate best estimate of pulse time
   reference_time_.store(interpolated_time, std::memory_order_relaxed);
 
-  auto time = rclcpp::Time(interpolated_time);
-  long sec = static_cast<long>(time.seconds());
-
   RCLCPP_INFO(this->get_logger(), 
-              "Sync pulse sent at ROS time: %ld.%09ld",
-              sec,
-              time.nanoseconds() % 1000000000);
-
+              "Sync pulse sent at linux monotonic time : %ld", interpolated_time);
   failed_sync_count_ = 0;
 }
 
@@ -299,9 +297,9 @@ void SerialManagerNode::processIncomingData(const std::string& data, std::string
     // the data should always be recorded in the past. 
     // in addtion this doesn't allow any packets for the esp32 have the wrong timestamp caused.
     // by a delay when re-sync the clocks and consequently having a time_stamp in the future.
-    int64_t now_nano = this->now().nanoseconds();
+    int64_t now_nano = getCurrentTime();
     if (time_stamp_in_namo < now_nano) {
-        msg.header.stamp = rclcpp::Time(time_stamp_in_namo); // convert the offset time to nano-seconds.
+        msg.monotonic_timestamp_ns = time_stamp_in_namo; // convert the offset time to nano-seconds.
         msg.linear_velocity = rps * wheel_circumference_; // convert rps to linear velocity in m/s
         wheel_data_pub_->publish(msg);
     } else {
