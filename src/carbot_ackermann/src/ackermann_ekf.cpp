@@ -207,10 +207,10 @@ void AckermannEKF::ekf_localisation(const uint64_t current_time_ns, const double
     // publish pose
     auto pose_msg = carbot_ackermann::msg::Pose();
     pose_msg.header.stamp = this->now(); // I'm not sure about this one yet. If I should use time from last control, imu, odom or now. 
-    pose_msg.x = static_cast<float>(prediction_state_(0));
-    pose_msg.y = static_cast<float>(prediction_state_(1));
-    pose_msg.yaw = static_cast<float>(prediction_state_(2));
-    pose_msg.linear_velocity = static_cast<float>(prediction_state_(3));
+    pose_msg.x = static_cast<float>(correction_state_(0));
+    pose_msg.y = static_cast<float>(correction_state_(1));
+    pose_msg.yaw = static_cast<float>(correction_state_(2));
+    pose_msg.linear_velocity = static_cast<float>(correction_state_(3));
 
     pose_msg.monotonic_timestamp_ns = current_time_ns;
     pose_publisher_->publish(pose_msg);
@@ -218,7 +218,8 @@ void AckermannEKF::ekf_localisation(const uint64_t current_time_ns, const double
     if (dt >= 0.025) {
         RCLCPP_WARN(this->get_logger(), "EKF localisation loop is running slowly. dt = %.4f seconds", dt);
     }
-    checkCovarianceStability();
+    // TODO: come back fix this, shouldn't be growing in linear time.
+    //checkCovarianceStability();
 }
 
 int main(int argc, char * argv[]) {
