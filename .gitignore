@@ -54,3 +54,5 @@ qtcreator-*
 CATKIN_IGNORE
 
 /rollouts
+
+/model_rollouts

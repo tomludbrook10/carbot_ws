@@ -1,14 +1,30 @@
 #include "carbot_inference/waypoint_sender.hpp"
 
-
 #include <rclcpp/rclcpp.hpp>
 #include "carbot_inference/msg/waypoints.hpp"
 #include <InferPipelineManager.hpp>
 
 
 WaypointSender::WaypointSender() : Node("waypoint_sender") {
+    this->declare_parameter("debug_mode", false);
+    this->declare_parameter("debug_output_dir", "");
+    this->declare_parameter("num_waypoints", 4);
+    this->declare_parameter("model_name", "simple_traj");
+    auto num_waypoints = this->get_parameter("num_waypoints").as_int();
+    auto debug_output_dir = this->get_parameter("debug_output_dir").as_string();
+    auto debug_mode = this->get_parameter("debug_mode").as_bool();
+    auto model_name = this->get_parameter("model_name").as_string();
 
-    infer_pipeline_manager_ = std::make_unique<InferPipelineManager>();
+    std::string save_path = "";
+    if (debug_mode) {
+        save_path = debug_output_dir;
+    }
+
+    infer_pipeline_manager_ = std::make_unique<InferPipelineManager>(
+        save_path,
+        "/home/tom/carbot_inference/config/config_preprocess.txt", 
+        "/home/tom/carbot_inference/" + model_name + ".engine",
+        num_waypoints);
 
     if (!infer_pipeline_manager_->setup()) {
         RCLCPP_ERROR(this->get_logger(), "Failed to set up InferPipelineManager.");

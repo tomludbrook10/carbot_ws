@@ -15,15 +15,25 @@ struct Pose {
     float yaw;
 };
 
+struct DebugInfo {
+    size_t frame_index;
+    Pose ref_pose; 
+    std::vector<float> waypoints;
+
+    DebugInfo() : frame_index(0), ref_pose{0.0, 0.0, 0.0}, waypoints{} {}
+    DebugInfo(size_t index, const Pose& pose, std::vector<float>& wpts)
+        : frame_index(index), ref_pose(pose), waypoints(wpts) {}
+};
+
 
 class PurePursuitController : public rclcpp::Node {
 public:
     PurePursuitController();
 
 private:
-    const float LOOKAHEAD_DISTANCE = 0.3;
-    const float SPEED = 0.2;
-    const size_t NUM_WAYPOINTS =  8;
+    const float LOOKAHEAD_DISTANCE = 0.15;
+    const float SPEED = 0.3;
+    size_t NUM_WAYPOINTS =  8;
     const float WHEELBASE = 0.178;
 
     rclcpp::Subscription<carbot_inference::msg::Waypoints>::SharedPtr waypoints_subscriber_;
@@ -40,4 +50,12 @@ private:
 
     Pose prev_odom_pose_ {0.0, 0.0, 0.0};
     Pose current_ref_pose_ {0.0, 0.0, 0.0};
+
+    bool debug_mode_ = false;
+    size_t num_frames_ = 0;
+    std::string debug_save_path_ = "";
+    std::vector<DebugInfo> debug_data_;
+
+    void save_debug_data();
+
 };
