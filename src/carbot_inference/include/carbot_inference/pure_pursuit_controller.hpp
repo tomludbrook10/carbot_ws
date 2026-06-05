@@ -25,15 +25,14 @@ struct DebugInfo {
         : frame_index(index), ref_pose(pose), waypoints(wpts) {}
 };
 
-
 class PurePursuitController : public rclcpp::Node {
 public:
     PurePursuitController();
 
 private:
     const float LOOKAHEAD_DISTANCE = 0.15;
-    const float SPEED = 0.3;
-    size_t NUM_WAYPOINTS =  8;
+    const float SPEED = 0.4;
+    size_t NUM_WAYPOINTS =  4;
     const float WHEELBASE = 0.178;
 
     rclcpp::Subscription<carbot_inference::msg::Waypoints>::SharedPtr waypoints_subscriber_;

@@ -20,8 +20,8 @@ ackermann_ekf_node:
     # state_vector = [x, y, theta, v]
     Q_covariance: [0.0001, 0.0, 0.0, 0.0, 
                     0.0, 0.0001, 0.0, 0.0, 
-                    0.0, 0.0, 1.0, 0.0, 
-                    0.0, 0.0, 0.0, 1.0]
+                    0.0, 0.0, 0.5, 0.0, 
+                    0.0, 0.0, 0.0, 0.1]
 
     # z = [theta_measured, v_measured]
     R_covariance: [0.0001, 0.0, # theta

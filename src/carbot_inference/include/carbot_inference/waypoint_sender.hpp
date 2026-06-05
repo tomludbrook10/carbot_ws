@@ -2,6 +2,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include "carbot_inference/msg/waypoints.hpp"
 #include <InferPipelineManager.hpp>
+#include <Coms.hpp>
+#include "UndiscretisePredict.hpp"
 
 #include <vector>
 #include <memory>
@@ -16,4 +18,9 @@ private:
 
     std::unique_ptr<InferPipelineManager> infer_pipeline_manager_;
     std::thread publish_thread_;
+    ModelContext model_context_;
+
+    bool is_discretise_ = false;
+    std::unique_ptr<UndiscretisePredict> undiscretise_predict_;
+
 };

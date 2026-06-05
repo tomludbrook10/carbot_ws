@@ -55,13 +55,17 @@ SerialManagerNode::SerialManagerNode(const rclcpp::NodeOptions & options)
 
 SerialManagerNode::~SerialManagerNode()
 {
+  sendCommandToESP32(0.0f, 0.0f); // Send stop command
   serial_thread_running_ = false;
   if (serial_thread_.joinable()) {
     serial_thread_.join();
   }
-  
-  if (serial_port_ && serial_port_->is_open()) {
-    serial_port_->close();
+
+  {
+    std::lock_guard<std::mutex> lock(serial_mutex_);
+    if (serial_port_ && serial_port_->is_open()) {
+      serial_port_->close();
+    }
   }
 
   if (gpio_initialized_) {

@@ -166,7 +166,7 @@ void AckermannEKF::correctState(const double yaw, const double linear_velocity) 
 
 void AckermannEKF::checkCovarianceStability() {
     for (int i = 0; i < STATE_SIZE; ++i) {
-        if (std::isnan(correction_covariance_(i, i)) || std::isinf(correction_covariance_(i, i) ) || correction_covariance_(i, i) > 1.0) {
+        if (std::isnan(correction_covariance_(i, i)) || std::isinf(correction_covariance_(i, i) ) || correction_covariance_(i, i) > 0.1) {
             RCLCPP_ERROR(this->get_logger(), "Covariance matrix unstable at index %d: %f", i, correction_covariance_(i, i));
         }
     }
@@ -218,7 +218,7 @@ void AckermannEKF::ekf_localisation(const uint64_t current_time_ns, const double
     if (dt >= 0.025) {
         RCLCPP_WARN(this->get_logger(), "EKF localisation loop is running slowly. dt = %.4f seconds", dt);
     }
-    // TODO: come back fix this, shouldn't be growing in linear time.
+    
     //checkCovarianceStability();
 }
 
