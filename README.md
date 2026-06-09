@@ -1,11 +1,11 @@
 # carbot_ws
 
-![carbot](docs/carbot.jpg)
+<img src="docs/carbot.jpg" alt="carbot" width="300">
 
 The ROS2 brain for **carbot** — my self-driving RC car that learns to drive from camera
 images. This is the glue that runs the whole thing live on a Jetson Orin Nano.
 
-<video src="docs/demo.mp4" controls width="640"></video>
+<video src="docs/demo.mp4" controls width="300"></video>
 
 *A small sample of one of the first basic ConvNet models I used — just getting out of the
 office.* ([clip](docs/demo.mp4))
