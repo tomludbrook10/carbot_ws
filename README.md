@@ -1,7 +1,14 @@
 # carbot_ws
 
+![carbot](docs/carbot.jpg)
+
 The ROS2 brain for **carbot** — my self-driving RC car that learns to drive from camera
 images. This is the glue that runs the whole thing live on a Jetson Orin Nano.
+
+<video src="docs/demo.mp4" controls width="640"></video>
+
+*A small sample of one of the first basic ConvNet models I used — just getting out of the
+office.* ([clip](docs/demo.mp4))
 
 The learned part goes from camera **pixels to waypoints**: the model looks at the image and
 predicts a short path of where the car should go next (running on the camera feed at ~4 FPS).

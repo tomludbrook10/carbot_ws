@@ -56,3 +56,8 @@ CATKIN_IGNORE
 /rollouts
 
 /model_rollouts
+# Raw phone media (HEIC/MOV, carry GPS EXIF) — keep the stripped docs/ versions instead
+*.HEIC
+*.MOV
+*.heic
+*.mov
