@@ -1,7 +1,12 @@
 // src/serial_manager_node.cpp
 #include "carbot_ackermann/serial_manager_node.hpp"
 #include <sstream>
+#include "carbot_ackermann/msg/odometry_data.hpp"
+#include "carbot_ackermann/msg/control_command.hpp"
 #include <iomanip>
+#include <jetgpio.h>
+#include <thread>
+#include <chrono>
 
 namespace ackermann_robot
 {
@@ -9,43 +14,40 @@ namespace ackermann_robot
 SerialManagerNode::SerialManagerNode(const rclcpp::NodeOptions & options)
 : Node("serial_manager_node", options),
   serial_thread_running_(false),
-  connection_established_(false)
-{
+  connection_established_(false) {
   // Declare parameters
   this->declare_parameter("serial_port", "/dev/ttyACM0");
   this->declare_parameter("baud_rate", 115200);
-  this->declare_parameter("serial_timeout_sec", 2.0);
   this->declare_parameter("wheel_circumference", 0.3078);
   
   // Get parameters
   serial_port_name_ = this->get_parameter("serial_port").as_string();
   baud_rate_ = this->get_parameter("baud_rate").as_int();
-  serial_timeout_sec_ = this->get_parameter("serial_timeout_sec").as_double();
   wheel_circumference_ = this->get_parameter("wheel_circumference").as_double();
 
     // Create publisher for wheel data
-  wheel_data_pub_ = this->create_publisher<std_msgs::msg::Float32MultiArray>(
-    "wheel_feedback", 10);
+  wheel_data_pub_ = this->create_publisher<carbot_ackermann::msg::OdometryData>(
+    "wheel_odometry", 10);
   
   // Create subscriber for control commands
-  control_cmd_sub_ = this->create_subscription<ackermann_msgs::msg::AckermannDriveStamped>(
-    "ackermann_cmd", 10,
+  control_cmd_sub_ = this->create_subscription<carbot_ackermann::msg::ControlCommand>(
+    "control_cmd", 10,
     std::bind(&SerialManagerNode::controlCommandCallback, this, std::placeholders::_1));
 
-  
-  // Create watchdog timer
-  watchdog_timer_ = this->create_wall_timer(
-    std::chrono::seconds(1),
-    std::bind(&SerialManagerNode::watchdogCallback, this));
-  
-  last_serial_msg_time_ = this->now();
+  // setting up the gpio.
+  setupGPIO();
 
-  // Initialize serial - CRITICAL: fail if cannot connect
+  // Initialize serial
   if (!initializeSerial()) {
     RCLCPP_FATAL(this->get_logger(), "Failed to initialize serial communication with ESP32");
     throw std::runtime_error("Serial initialization failed - cannot start robot system");
   }
-  
+
+  // sync the esp32 clock and ros2 time every 30 seconds.
+  timer_ = this->create_wall_timer(
+                std::chrono::seconds(30),
+                std::bind(&SerialManagerNode::send_pulse, this));
+
   RCLCPP_INFO(this->get_logger(), 
     "Serial Manager initialized successfully on %s at %d baud",
     serial_port_name_.c_str(), baud_rate_);
@@ -53,14 +55,64 @@ SerialManagerNode::SerialManagerNode(const rclcpp::NodeOptions & options)
 
 SerialManagerNode::~SerialManagerNode()
 {
+  sendCommandToESP32(0.0f, 0.0f); // Send stop command
   serial_thread_running_ = false;
   if (serial_thread_.joinable()) {
     serial_thread_.join();
   }
-  
-  if (serial_port_ && serial_port_->is_open()) {
-    serial_port_->close();
+
+  {
+    std::lock_guard<std::mutex> lock(serial_mutex_);
+    if (serial_port_ && serial_port_->is_open()) {
+      serial_port_->close();
+    }
   }
+
+  if (gpio_initialized_) {
+    gpioWrite(SYNC_GPIO, 0);
+    gpioTerminate();
+    RCLCPP_INFO(this->get_logger(), "GPIO terminated");
+  }
+}
+
+void SerialManagerNode::setupGPIO() {
+  if (gpioInitialise() < 0) {
+    RCLCPP_ERROR(this->get_logger(), "Failed to initialize jetgpio");
+    throw std::runtime_error("jetgpio initialization failed");
+  }
+
+  gpio_initialized_ = true;
+  
+  // Setup GPIO pin
+  gpioSetMode(SYNC_GPIO, JET_OUTPUT);
+  gpioWrite(SYNC_GPIO, 0);  // Start low
+  
+  RCLCPP_INFO(this->get_logger(), "GPIO initialized on pin %d", SYNC_GPIO);
+}
+
+uint64_t SerialManagerNode::getCurrentTime() {
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+void SerialManagerNode::send_pulse() {
+  // Get ROS time just before pulse
+  auto pre_pulse_time = getCurrentTime();
+  
+  // Send hardware pulse with minimal latency
+  gpioWrite(SYNC_GPIO, 1);
+  std::this_thread::sleep_for(std::chrono::microseconds(PULSE_WIDTH_US)); // Microsecond delay
+  gpioWrite(SYNC_GPIO, 0);
+  
+  // Get ROS time just after pulse
+  auto post_pulse_time = getCurrentTime();
+
+  auto interpolated_time = (pre_pulse_time + post_pulse_time) / 2;
+  // Calculate best estimate of pulse time
+  reference_time_.store(interpolated_time, std::memory_order_relaxed);
+
+  RCLCPP_INFO(this->get_logger(), 
+              "Sync pulse sent at linux monotonic time : %ld", interpolated_time);
+  failed_sync_count_ = 0;
 }
 
 bool SerialManagerNode::initializeSerial()
@@ -84,7 +136,10 @@ bool SerialManagerNode::initializeSerial()
     
     // Reset ESP32
     resetESP32();
-    
+
+    // Sync clock
+    syncESP32Clock();
+
     // Start serial reading thread
     serial_thread_running_ = true;
     serial_thread_ = std::thread(&SerialManagerNode::serialReadThread, this);
@@ -152,27 +207,32 @@ void SerialManagerNode::resetESP32()
       }
     }
     
-    RCLCPP_INFO(this->get_logger(), "ESP32 reset complete");
+    RCLCPP_INFO(this->get_logger(), "ESP32 reset complete, now syncing clocks");
+}
+
+void SerialManagerNode::syncESP32Clock() {
+  send_pulse();
 }
 
 void SerialManagerNode::serialReadThread()
 {
   boost::asio::streambuf buffer;
-  
+  std::string line; line.reserve(100);
+  std::string token; token.reserve(10);
+
   while (serial_thread_running_ && rclcpp::ok()) {
     try {
       boost::system::error_code ec;
-      size_t bytes_transferred = boost::asio::read_until(
-        *serial_port_, buffer, '\n', ec);
+      boost::asio::read_until(*serial_port_, buffer, '\n', ec);
       
       if (!ec) {
         std::istream is(&buffer);
-        std::string line;
         std::getline(is, line);
-        
-        processIncomingData(line);
-        last_serial_msg_time_ = this->now();
+
+        processIncomingData(line, token);
       }
+      token.clear();
+      line.clear();
     }
     catch (const std::exception& e) {
       RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
@@ -181,28 +241,78 @@ void SerialManagerNode::serialReadThread()
   }
 }
 
-void SerialManagerNode::processIncomingData(const std::string& data)
+void SerialManagerNode::processLogMessage(const std::string& log_msg)
 {
-  // Expected format from ESP32: "RPS,STEERING_ANGLE"
-  // Example: "2.5,0.15"
+  RCLCPP_WARN(this->get_logger(), "ESP32 Log: %s", log_msg.c_str());
+}
+
+void SerialManagerNode::processIncomingData(const std::string& data, std::string& token)
+{
+  // Expected format from ESP32: "(),TimeStamp,RPS,STEERING_ANGLE"
+  // () can be == D for data or L for log message.
   
   try {
     std::stringstream ss(data);
-    std::string token;
     // using a vector here is very inefficent. 
     // and using all of these strings.
-    std::vector<float> values;
-    
+
+    char data_type;
+    int64_t offset_time; 
+    float rps;
+
+    int count = 0;
     while (std::getline(ss, token, ',')) {
-      values.push_back(std::stof(token));
+      if (count == 0) {
+        data_type = token[0];
+        if (data_type == 'L') {
+          // log message, the rest is the log.
+          break;
+        }
+        count++;
+      } else if(count == 1) {
+        offset_time = std::stoull(token);
+        count++;
+      } else if (count == 2) {
+        rps = std::stof(token);
+        count++;
+      }
+    }
+
+    if (data_type != 'D' && data_type != 'L') {
+      RCLCPP_WARN(this->get_logger(), "Unknown data type received: %c, message: %s", data_type, data.c_str());
+      return;
+    }
+
+    if (data_type == 'L') {
+      processLogMessage(data.substr(2)); // Skip "L,"
+      return;
+    }
+
+    if (count != 3 || std::isnan(rps)) {
+      RCLCPP_WARN(this->get_logger(), "Invalid data format received: %s", data.c_str());
+      return;
     }
     
-    if (values.size() == 2) {
-      // Publish wheel feedback data
-      std_msgs::msg::Float32MultiArray msg;
-      msg.data.push_back(values[0]);  // RPS (revolutions per second)
-      msg.data.push_back(values[1]);  // Steering angle (radians)
-      wheel_data_pub_->publish(msg);
+    // Publish wheel feedback data
+    carbot_ackermann::msg::OdometryData msg;
+    auto current_reference_time = reference_time_.load(std::memory_order_relaxed);
+    int64_t time_stamp_in_namo = current_reference_time + offset_time * 1000;
+
+    // the data should always be recorded in the past. 
+    // in addtion this doesn't allow any packets for the esp32 have the wrong timestamp caused.
+    // by a delay when re-sync the clocks and consequently having a time_stamp in the future.
+    int64_t now_nano = getCurrentTime();
+    if (time_stamp_in_namo < now_nano) {
+        msg.monotonic_timestamp_ns = time_stamp_in_namo; // convert the offset time to nano-seconds.
+        msg.linear_velocity = rps * wheel_circumference_; // convert rps to linear velocity in m/s
+        wheel_data_pub_->publish(msg);
+    } else {
+      RCLCPP_INFO(this->get_logger(), "Time stamp was in the future, ignoring. received: %ld, now: %ld", time_stamp_in_namo, now_nano);
+      failed_sync_count_++;
+      if (failed_sync_count_ >= MAX_FAILED_SYNC) {
+        RCLCPP_WARN(this->get_logger(), "Multiple failed syncs detected, re-syncing clocks.");
+        syncESP32Clock();
+      }
     }
   }
   catch (const std::exception& e) {
@@ -212,29 +322,32 @@ void SerialManagerNode::processIncomingData(const std::string& data)
 }
 
 void SerialManagerNode::controlCommandCallback(
-  const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg)
+  const carbot_ackermann::msg::ControlCommand::SharedPtr msg)
 {
   // Send control command to ESP32
-  sendCommandToESP32(msg->drive.speed, msg->drive.steering_angle);
+  sendCommandToESP32(msg->linear_velocity, msg->steering_angle);
 }
 
-void SerialManagerNode::sendCommandToESP32(double speed, double steering_angle)
+void SerialManagerNode::sendCommandToESP32(float speed, float steering_angle)
 {
+  /// takes speed in m/s and steering angle in radius and makes a converstion to robots rsp and steerrign angle in degrees.
+
   if (!connection_established_) {
     RCLCPP_WARN(this->get_logger(), "Cannot send command - no ESP32 connection");
     return;
   }
-
-  double rps = speed / wheel_circumference_;
-  steering_angle = -steering_angle * (180.0 / M_PI);
+  
+  float rps = speed / wheel_circumference_;
+  int steering_angle_output = static_cast<int>(-steering_angle * (180.0 / M_PI));
   
   // Format command: "A:acceleration,S:steering_angle\n"
   std::stringstream ss;
-  ss << std::fixed << std::setprecision(3);
-  ss << "<" << rps << "," << steering_angle << ">" << "\n";
+  ss << std::fixed << std::setprecision(2);
+  ss << "<" << rps << "," << steering_angle_output << ">" << "\n";
   
   std::string command = ss.str();
   
+  // note that the only place that uses the serial port is here so we don't need the lock.
   try {
     std::lock_guard<std::mutex> lock(serial_mutex_);
     boost::asio::write(*serial_port_, boost::asio::buffer(command));
@@ -244,24 +357,6 @@ void SerialManagerNode::sendCommandToESP32(double speed, double steering_angle)
   }
 }
 
-void SerialManagerNode::watchdogCallback()
-{
-  double time_since_last = (this->now() - last_serial_msg_time_).seconds();
-  
-  if (time_since_last > serial_timeout_sec_) {
-    RCLCPP_ERROR(this->get_logger(), 
-      "Serial timeout! No data for %.1f seconds", time_since_last);
-    connection_established_ = false;
-    
-    // Try to reset
-    if (time_since_last > serial_timeout_sec_ * 2) {
-      RCLCPP_INFO(this->get_logger(), "Attempting reconnection...");
-      resetESP32();
-      last_serial_msg_time_ = this->now();
-      connection_established_ = true;
-    }
-  }
-}
 
 }  // namespace ackermann_robot
 

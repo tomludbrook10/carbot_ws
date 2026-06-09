@@ -52,3 +52,7 @@ qtcreator-*
 
 # Catkin custom files
 CATKIN_IGNORE
+
+/rollouts
+
+/model_rollouts

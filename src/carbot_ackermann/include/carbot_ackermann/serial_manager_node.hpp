@@ -9,10 +9,10 @@
 #include <atomic>
 
 #include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/float32_multi_array.hpp"
-#include "ackermann_msgs/msg/ackermann_drive_stamped.hpp"
 #include <boost/asio.hpp>
 #include <boost/asio/serial_port.hpp>
+#include "carbot_ackermann/msg/odometry_data.hpp"
+#include "carbot_ackermann/msg/control_command.hpp"
 
 namespace ackermann_robot
 {
@@ -24,28 +24,39 @@ public:
   ~SerialManagerNode();
 
 private:
+  // timer sync
+  static constexpr int SYNC_GPIO = 7;
+  static constexpr int PULSE_WIDTH_US = 10; // 10 mirco seconds
+  bool gpio_initialized_ = false;
+  std::atomic<uint64_t> reference_time_;
+  rclcpp::TimerBase::SharedPtr timer_;
+
+  uint64_t getCurrentTime();
+
+
+  void setupGPIO();
+  void send_pulse();
+
+  void reset_timer();
+
   // Serial communication methods
   bool initializeSerial();
   void resetESP32();
+  void syncESP32Clock();
   void serialReadThread();
-  void processIncomingData(const std::string& data);
-  void sendCommandToESP32(double acceleration, double steering_angle);
+  void processIncomingData(const std::string& data, std::string& token);
+  void sendCommandToESP32(float speed, float steering_angle);
+  void processLogMessage(const std::string& log_msg);
   
   // Callback for control commands
-  void controlCommandCallback(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg);
-  
-  // Watchdog timer
-  void watchdogCallback();
+  void controlCommandCallback(const carbot_ackermann::msg::ControlCommand::SharedPtr msg);
 
   // Publishers - publishes raw wheel data from ESP32
-  rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr wheel_data_pub_;
+  rclcpp::Publisher<carbot_ackermann::msg::OdometryData>::SharedPtr wheel_data_pub_;
   
   // Subscribers - receives control commands
-  rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr control_cmd_sub_;
-  
-  // Timer for watchdog
-  rclcpp::TimerBase::SharedPtr watchdog_timer_;
-  
+  rclcpp::Subscription<carbot_ackermann::msg::ControlCommand>::SharedPtr control_cmd_sub_;
+
   // Serial port handling
   std::unique_ptr<boost::asio::io_service> io_service_;
   std::unique_ptr<boost::asio::serial_port> serial_port_;
@@ -58,12 +69,13 @@ private:
   int baud_rate_;
 
   // convertion from linear_velocity to rps. 
-  double wheel_circumference_;
+  float wheel_circumference_;
   
   // Communication state
-  rclcpp::Time last_serial_msg_time_;
-  double serial_timeout_sec_;
   bool connection_established_;
+
+  const int MAX_FAILED_SYNC = 5;
+  int failed_sync_count_ = 0;
 };
 
 }  // namespace ackermann_robot

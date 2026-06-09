@@ -6,27 +6,23 @@ serial_manager:
     serial_timeout_sec: 2.0           # Timeout before attempting reconnection
     wheel_circumference: 0.3078       # Used to decode from the esp32. 
 
-# Odometry Node Parameters  
-odometry_node:
+imu_publisher:
   ros__parameters:
-    # Vehicle geometry
-    wheelbase:  0.178                    # Distance between front and rear axles (meters)
-    max_steering_angle: 0.4363326           # Maximum steering angle (radians, ~25 degrees)
-    wheel_circumference: 0.3078       # Used to decode from the esp32.
-    
-    # Frame configuration
-    odom_frame_id: "odom"
-    base_frame_id: "base_link"
-    publish_tf: false                  # Whether to publish TF transforms
+    topic_name: "imu"
+    sample_freq_mill: 10 # sample frequency in milliseconds.
 
-# Control Node Parameters
-control_node:
+ackermann_ekf_node:
   ros__parameters:
+    wheel_base: 0.178
+    control_buffer_size: 10
+    publish_rate_hz: 20
 
-    # Motion limits
-    wheelbase:  0.178                    # Distance between front and rear axles (meters)
-    max_steering_angle: 0.4363326           # Maximum steering angle (radians, ~25 degrees)
-    max_speed: 1.7
-    
-    # Safety
-    cmd_timeout_sec: 0.5   
+    # state_vector = [x, y, theta, v]
+    Q_covariance: [0.0001, 0.0, 0.0, 0.0, 
+                    0.0, 0.0001, 0.0, 0.0, 
+                    0.0, 0.0, 0.5, 0.0, 
+                    0.0, 0.0, 0.0, 0.1]
+
+    # z = [theta_measured, v_measured]
+    R_covariance: [0.0001, 0.0, # theta
+                  0.0, 0.0001] # v
