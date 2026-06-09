@@ -11,7 +11,7 @@ images. This is the glue that runs the whole thing live on a Jetson Orin Nano.
 office.* ([clip](docs/demo.mp4))
 
 The learned part goes from camera **pixels to waypoints**: the model looks at the image and
-predicts a short path of where the car should go next (running on the camera feed at ~4 FPS).
+predicts a short path of where the car should go next.
 A **pure-pursuit controller** then follows those waypoints, turning them into steering + speed.
 The serial node sends that down to the ESP32 and reads odometry back. Pose comes from a
 hand-rolled EKF (`ackermann_ekf`) that dead-reckons the car — an Ackermann motion model off
