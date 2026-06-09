@@ -12,10 +12,6 @@ the drive commands, corrected with wheel-speed odometry + IMU yaw (no GPS or map
 the car is relative to where it started), running at 20 Hz. That pose is what pure pursuit
 follows against. There's also keyboard teleop for manual control.
 
-Things I learnt building this: getting a model to drive a car straight from camera images is
-really, *really* hard. (I have since developed a deep respect for anyone who does this for a
-living.)
-
 **Packages:** `carbot_ackermann` (serial bridge, IMU, EKF) · `carbot_inference` (waypoint
 sender + pure pursuit) · `teleop`
 
